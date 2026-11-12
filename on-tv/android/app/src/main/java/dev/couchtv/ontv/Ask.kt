@@ -1,5 +1,6 @@
 package dev.couchtv.ontv
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -80,7 +81,12 @@ object Ask {
             JSONObject().put("app", str("App id or Android package")), listOf("app")),
         AskTool("key", "Press a remote key: up, down, left, right, ok, back, home, play_pause, volume_up, volume_down, mute.",
             JSONObject().put("key", str("Key name")), listOf("key")),
-        AskTool("now", "What is on the TV right now.", JSONObject(), emptyList()))
+        AskTool("now", "What is on the TV right now.", JSONObject(), emptyList()),
+        AskTool("suggest", "Offer two to four specific shows or films as buttons the person can tap to start them. Use this for any suggestion or recommendation instead of listing titles in your reply.",
+            JSONObject().put("items", JSONObject().put("type", "array").put("description", "The suggestions")
+                .put("items", JSONObject().put("type", "object")
+                    .put("properties", JSONObject().put("title", str("Show or film name")).put("service", str("App id from the list that can play it, for example netflix")))
+                    .put("required", JSONArray().put("title")))), listOf("items")))
 
     fun ask(text: String, who: String?): JSONObject {
         val cfg = config()
@@ -88,11 +94,15 @@ object Ask {
         val started = System.currentTimeMillis()
         val system = "You control a TV through tools. Do what the person asks with the fewest tool calls, then reply in one or two short plain sentences. " +
             "Apps on this TV: ${installedApps()}. Only open apps from this list. " +
-            "If the person asks for a suggestion or recommendation, do not use tools: reply with two or three specific titles, each with one app from the list above that could play it. Never name an app that is not in the list. " +
+            "If the person asks for a suggestion or recommendation, call the suggest tool once with two to four specific titles, each with one app id from the list above that could play it, then reply with one short sentence introducing them. Never name an app that is not in the list. " +
+            "Reply in plain text only: no markdown, no asterisks, no bullet lists. " +
             "If something fails, try at most one other way, then say plainly what did not work. " +
             "Country: ${Store.country()}." + (who?.let { " Watching: $it." } ?: "")
-        val out = AskWire.run(AskWire.chat(cfg, system, TOOLS), text, { url, headers, body -> call(cfg, url, headers, body) }, { name, a -> runTool(name, a, who) })
-        return JSONObject().put("ok", true).put("reply", out.reply).put("actions", out.actions)
+        val options = JSONArray()
+        val out = AskWire.run(AskWire.chat(cfg, system, TOOLS), text, { url, headers, body -> call(cfg, url, headers, body) }, { name, a ->
+            if (name == "suggest") collectSuggestions(a, options) else runTool(name, a, who)
+        })
+        return JSONObject().put("ok", true).put("reply", out.reply).put("actions", out.actions).put("options", options)
             .put("seconds", (System.currentTimeMillis() - started) / 1000.0)
     }
 
@@ -108,6 +118,23 @@ object Ask {
             .joinToString(", ") { (pkg, label) -> "$label (${Apps.BY_PACKAGE[pkg]?.id ?: pkg})" }
             .ifEmpty { "unknown" }
     } catch (e: Exception) { "unknown" }
+
+    /** Suggestions become tap buttons on the phone: each one starts its show when pressed (never more than four). */
+    private fun collectSuggestions(a: JSONObject, into: JSONArray): String {
+        val items = a.optJSONArray("items") ?: return "no items"
+        for (i in 0 until items.length()) {
+            if (into.length() >= 4) break
+            val item = items.optJSONObject(i) ?: continue
+            val title = item.optString("title").trim().take(80)
+            if (title.isEmpty()) continue
+            val service = item.optString("service").trim().ifEmpty { null }
+            val app = service?.let { Apps.BY_ID[it]?.name }
+            val play = JSONObject().put("title", title)
+            if (service != null) play.put("service", service)
+            into.put(JSONObject().put("label", if (app != null) "$title · $app" else title).put("text", title).put("play", play))
+        }
+        return "shown as buttons"
+    }
 
     private fun runTool(name: String, a: JSONObject, who: String?): String = when (name) {
         "play" -> Finder.play(a.getString("title"), a.optInt("season").takeIf { it > 0 }, a.optInt("episode").takeIf { it > 0 }, a.optString("service").ifEmpty { null }, who).toString()

@@ -236,8 +236,17 @@ class OpenAiChat(cfg: AskConfig, system: String, tools: List<AskTool>) : AskChat
     override fun headers(): Map<String, String> {
         val h = linkedMapOf("content-type" to "application/json")
         if (!cfg.key.isNullOrEmpty()) h["authorization"] = "Bearer ${cfg.key}"
+        // OpenCode Go and Zen route by a stable session id and want a client name of its own, not a library's.
+        val host = AskWire.host(cfg.base)
+        if (host == "opencode.ai" || host?.endsWith(".opencode.ai") == true) {
+            h["x-opencode-session"] = session
+            h["user-agent"] = "couch-tv-ontv/1"
+        }
         return h
     }
+
+    /** One id for the whole conversation (every round of one ask), as OpenCode asks. */
+    private val session = java.util.UUID.randomUUID().toString()
 
     override fun addUser(text: String) { messages.put(JSONObject().put("role", "user").put("content", text)) }
 

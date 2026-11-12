@@ -45,7 +45,27 @@ const loadThread = () => {
 const saveThread = (items) => { try { sessionStorage.setItem(THREAD_KEY, JSON.stringify({ at: Date.now(), items })); } catch { /* private mode */ } };
 const friendly = (msg) => (msg === 'Can’t reach the bridge' ? t('cant_reach_wifi') : msg);
 
-export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAsk, onDone }, inputRef) {
+// The model sometimes answers in markdown (**bold**, "- " lists). Show that as text, never as raw HTML.
+function Md({ text }) {
+  const inline = (line) => String(line).split(/(\*\*[^*]+\*\*)/g).map((part, i) => (
+    /^\*\*[^*]+\*\*$/.test(part) ? <strong key={i}>{part.slice(2, -2)}</strong> : part.replace(/\*/g, '')
+  ));
+  const blocks = [];
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const item = line.match(/^(?:[-•*]|\d+[.)])\s+(.*)$/);
+    if (item) {
+      const last = blocks[blocks.length - 1];
+      if (last && last.list) last.items.push(item[1]); else blocks.push({ list: true, items: [item[1]] });
+    } else blocks.push({ p: line });
+  }
+  return blocks.map((b, i) => (b.list
+    ? <ul key={i} className="md-list">{b.items.map((x, j) => <li key={j}>{inline(x)}</li>)}</ul>
+    : <span key={i} className="md-p">{inline(b.p)}</span>));
+}
+
+export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAsk, onDone, onPlay }, inputRef) {
   const [text, setText] = useState('');
   const [thread, setThread] = useState(loadThread);
   const [secs, setSecs] = useState(0);
@@ -107,7 +127,7 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
     let reply;
     try {
       const r = await onAsk(ask);
-      reply = { text: r.say || r.reply || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 3), still: /^Still working on it/.test(r.reply || '') };
+      reply = { text: r.say || r.reply || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 4), still: /^Still working on it/.test(r.reply || '') };
       // The chat never closes by itself (it used to close after a plain "done it" answer). It closes
       // only on the X, the scrim, Escape or Back; the answer stays in the thread.
       if (c === chat.current) tick();
@@ -176,13 +196,13 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
               <small>{t('finding')}{secs > 3 ? ` · ${secs}s` : ''}. {t('usually')}</small>
             </div>
           ) : (
-            <p key={m.id} className={`bubble claude ${m.err ? 'err' : ''}`}><span className="sr-only">Claude: </span>{m.text}
+            <p key={m.id} className={`bubble claude ${m.err ? 'err' : ''}`}><span className="sr-only">Claude: </span><Md text={m.text} />
               {m.still && <small>{t('carries_on')}</small>}</p>
           )))}
           {chips.length > 0 && (
             <div className="replies" aria-label="Quick replies">
               {chips.map((o) => (
-                <button key={o.text} type="button" className="chip glass reply-chip" onClick={() => { tick(); submit(o.text); }}>{o.label || o.text}</button>
+                <button key={o.text} type="button" className="chip glass reply-chip" onClick={() => { tick(); if (o.play && onPlay) { onPlay(o.play); onClose(); } else submit(o.text); }}>{o.play ? '▶ ' : ''}{o.label || o.text}</button>
               ))}
             </div>
           )}
