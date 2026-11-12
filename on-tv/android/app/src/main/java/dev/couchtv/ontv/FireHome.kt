@@ -235,7 +235,16 @@ object FireHome {
         }
     }
 
+    /**
+     * The separate Couch TV Home app (tv-home, `app.couchtv.launcher`) has its own Home button watch. With both
+     * installed and both watching, each pulls its own home to the front when the TV's home appears, and the Home key
+     * lands on neither. So when the Home app is there, this app steps aside and only that one watches.
+     */
+    private const val HOME_APP = "app.couchtv.launcher"
+    private val homeAppPresent: Boolean get() = Tv.hasPackage(HOME_APP)
+
     private fun jump(force: Boolean = false) {
+        if (homeAppPresent) return
         if (!force && !wanted) return
         val now = System.currentTimeMillis()
         if (now - lastJump < 1200) return   // one jump per press, not one per event
