@@ -42,6 +42,12 @@
         <package android:name="com.amazon.tv.launcher" />
         <package android:name="com.google.android.apps.tv.launcherx" />
         <package android:name="com.google.android.tvlauncher" />
+        <!-- The separate Couch TV Home app: the Home watch steps aside for it and Screen off is shown by it. -->
+        <package android:name="app.couchtv.launcher" />
+        <!-- Ask on the TV: is there a speech recognizer to listen with? -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
     </queries>
 
     <application
@@ -54,6 +60,13 @@
         android:allowBackup="false"
         android:supportsRtl="false">
 
+        <!-- Ask on the TV with the remote: opened from the Couch TV Home's Ask quick button. -->
+        <activity
+            android:name=".AskActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="landscape" />
         <!-- The setup screen: the "Couch TV" tile in the TV's app list. -->
         <activity
             android:name=".SetupActivity"

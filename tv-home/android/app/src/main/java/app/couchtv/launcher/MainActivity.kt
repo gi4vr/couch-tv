@@ -208,6 +208,12 @@ class MainActivity : Activity() {
         js("window.tv && tv.pause && tv.pause()")   // the video background stops while an app is in front
     }
 
+    private fun openAskScreenAllowed() = runCatching { packageManager.getPackageInfo("dev.couchtv.ontv", 0); true }.getOrDefault(false)
+
+    private fun openAskScreen(): Boolean = runCatching {
+        startActivity(Intent().setClassName("dev.couchtv.ontv", "dev.couchtv.ontv.AskActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true
+    }.getOrDefault(false)
+
     private val BACK_HOLD_MS = 2000L
     private var backHoldDone = false
 
@@ -222,6 +228,12 @@ class MainActivity : Activity() {
         if (same != null) {
             return dispatchKeyEvent(KeyEvent(event.downTime, event.eventTime, event.action, same, event.repeatCount,
                 event.metaState, event.deviceId, event.scanCode, event.flags, event.source))
+        }
+        // The remote's voice or assistant button, while couch-tv is in front: Ask on the TV (only where the
+        // on-TV app is installed; the key goes on to the system otherwise).
+        if ((event.keyCode == KeyEvent.KEYCODE_VOICE_ASSIST || event.keyCode == KeyEvent.KEYCODE_ASSIST) && openAskScreenAllowed()) {
+            if (event.action == KeyEvent.ACTION_UP) openAskScreen()
+            return true
         }
         // The remote's Settings/gear key: couch-tv's own gear menu (Home settings or TV settings).
         // The WebView does not pass KEYCODE_SETTINGS on to the page, so it is caught here.
@@ -688,6 +700,13 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun openInputs(): Boolean = inputsIntent()?.let { start(it) } ?: false
+
+        // Ask on the TV with the remote: the on-TV app's Ask screen (voice or the remote's keyboard).
+        @JavascriptInterface
+        fun canOpenAsk(): Boolean = runCatching { packageManager.getPackageInfo("dev.couchtv.ontv", 0); true }.getOrDefault(false)
+
+        @JavascriptInterface
+        fun openAsk(): Boolean = openAskScreen()
 
         // Screen off / Audio-only mode: drops window backlight override to 0f on Android TV
         // while soundscapes, Spotify or background media continue playing.

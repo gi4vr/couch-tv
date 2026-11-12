@@ -38,6 +38,8 @@
         <package android:name="com.amazon.tv.launcher" />
         <package android:name="com.google.android.apps.tv.launcherx" />
         <package android:name="com.google.android.tvlauncher" />
+        <!-- The on-TV app: its Ask screen is opened from the Ask quick button. -->
+        <package android:name="dev.couchtv.ontv" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />

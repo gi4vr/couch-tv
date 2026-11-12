@@ -52,7 +52,7 @@
   // read in readConfig() once the page starts (mock.js fills them in for previews). See docs/CONFIG.md.
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [];
   var WXCFG = { lat: -33.8688, lon: 151.2093, place: "Sydney", timezone: "Australia/Sydney" };
-  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "screensaver", "extend"];
+  var QUICK_ALL = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "screensaver", "extend", "ask"];
   // The most personal photos this TV keeps (also MAX_PHOTOS in bridge/server.py and MainActivity.kt).
   var MAX_PHOTOS = 50;
   var ON_TV = false;   // served by the on-TV app (config "mode"), which can open the TV's own settings screens
@@ -236,6 +236,7 @@
     gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
     look: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="M2.5 16l5.5-5.5 4.5 4.5 3-3 6 6"/><circle cx="16.5" cy="8.8" r="1.6"/></svg>',
     soundscape: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+    ask: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
     screen_off: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4M3 3l18 18"/></svg>',
     input: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>',
     ps5: '<svg viewBox="0 0 24 24"><path d="M7 6v12M17 6v12M7 10h10M7 14h10"/><circle cx="12" cy="12" r="8.5"/></svg>',
@@ -1535,6 +1536,7 @@
       if (q === "screensaver") return nativeScreensaver();
       if (q === "bluetooth" || q === "network") return nativeSettingsScreen() || (ON_TV && !OFFLINE);
       if (q === "extend") return devOn();
+      if (q === "ask") return !!(TV && TV.canOpenAsk && TV.canOpenAsk());
       return false;
     });
   }
@@ -1578,6 +1580,8 @@
         el.innerHTML = ICONS.headphones + "<span>" + esc(t("headphones")) + "</span>";
       } else if (q === "screen_off") {
         el.innerHTML = ICONS.screen_off + "<span>" + esc(t("screen_off")) + "</span>";
+      } else if (q === "ask") {
+        el.innerHTML = ICONS.ask + "<span>" + esc(t("quick_ask")) + "</span>";
       } else if (q === "input") {
         el.innerHTML = ICONS.input + "<span>" + esc(t("input")) + "</span>";
       } else if (q === "screensaver") {
@@ -1861,6 +1865,7 @@
     else if (q === "input") openInputs();
     else if (q === "screensaver") startScreensaver();
     else if (q === "extend") devExtend();
+    else if (q === "ask") { try { TV.openAsk(); } catch (e) {} }
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
   }
   // Headphones: the TV's own Bluetooth screen. The launcher opens it itself, the on-TV app through

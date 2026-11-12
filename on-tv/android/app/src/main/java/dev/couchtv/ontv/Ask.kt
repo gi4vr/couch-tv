@@ -82,6 +82,11 @@ object Ask {
         AskTool("key", "Press a remote key: up, down, left, right, ok, back, home, play_pause, volume_up, volume_down, mute.",
             JSONObject().put("key", str("Key name")), listOf("key")),
         AskTool("now", "What is on the TV right now.", JSONObject(), emptyList()),
+        AskTool("volume", "Change the TV volume: up, down or mute, or set a level from 0 to 100.",
+            JSONObject().put("action", str("up, down, mute")).put("steps", int()).put("level", int()), emptyList()),
+        AskTool("sleep_timer", "Pause what is playing and turn the TV off after a number of minutes. Zero cancels a timer.",
+            JSONObject().put("minutes", int()), listOf("minutes")),
+        AskTool("power", "Turn the TV off now (it stays reachable on the network).", JSONObject(), emptyList()),
         AskTool("suggest", "Offer two to four specific shows or films as buttons the person can tap to start them. Use this for any suggestion or recommendation instead of listing titles in your reply.",
             JSONObject().put("items", JSONObject().put("type", "array").put("description", "The suggestions")
                 .put("items", JSONObject().put("type", "object")
@@ -95,6 +100,7 @@ object Ask {
         val system = "You control a TV through tools. Do what the person asks with the fewest tool calls, then reply in one or two short plain sentences. " +
             "Apps on this TV: ${installedApps()}. Only open apps from this list. " +
             "If the person asks for a suggestion or recommendation, call the suggest tool once with two to four specific titles, each with one app id from the list above that could play it, then reply with one short sentence introducing them. Never name an app that is not in the list. " +
+            "You can also change the volume, set or cancel the sleep timer, and turn the TV off with the tools. " +
             "Reply in plain text only: no markdown, no asterisks, no bullet lists. " +
             "If something fails, try at most one other way, then say plainly what did not work. " +
             "Country: ${Store.country()}." + (who?.let { " Watching: $it." } ?: "")
@@ -141,6 +147,22 @@ object Ask {
         "launch" -> { val app = Apps.BY_ID[a.getString("app")]; Tv.launchPackage(app?.pkg ?: a.getString("app")); "opened" }
         "key" -> Tv.key(a.getString("key"))
         "now" -> Now.payload().toString()
+        "volume" -> {
+            if (a.has("level")) Tv.setLevel(a.getInt("level"))
+            else {
+                val code = mapOf("up" to "KEYCODE_VOLUME_UP", "down" to "KEYCODE_VOLUME_DOWN", "mute" to "KEYCODE_VOLUME_MUTE")[a.optString("action")]
+                    ?: throw IllegalArgumentException("action must be up, down or mute, or give a level")
+                val steps = if (code.endsWith("MUTE")) 1 else a.optInt("steps", 3).coerceIn(1, 20)
+                repeat(steps) { Tv.volumeKey(code); Thread.sleep(80) }
+            }
+            JSONObject(Tv.volume()).toString()
+        }
+        "sleep_timer" -> {
+            val min = a.optInt("minutes", 0).coerceIn(0, 600)
+            App.setSleep(if (min > 0) System.currentTimeMillis() + min * 60_000L else null)
+            if (min > 0) "the TV turns off in $min minutes" else "sleep timer cancelled"
+        }
+        "power" -> { Tv.powerOff(); "turned off" }
         else -> throw IllegalArgumentException("unknown tool $name")
     }
 
