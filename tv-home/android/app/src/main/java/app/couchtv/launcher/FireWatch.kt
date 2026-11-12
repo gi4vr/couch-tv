@@ -220,6 +220,7 @@ class FireWatch : AccessibilityService() {
 
         /** Puts the watcher back on, only where a computer granted secure settings and the TV has a stock home. */
         fun ensure(c: Context) {
+            runCatching { KeyWatch.ensure(c) }   // the mic button, where the on-TV app is installed
             if (c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != PackageManager.PERMISSION_GRANTED) return
             if (STOCK_HOMES.none { p -> runCatching { c.packageManager.getPackageInfo(p, 0) }.isSuccess }) return
             runCatching {

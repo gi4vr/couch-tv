@@ -35,43 +35,92 @@ class AskActivity : Activity() {
     private lateinit var options: LinearLayout
     private var busy = false
 
+    private val amber = Color.parseColor("#FFB52E")
+    private val ink = Color.parseColor("#F2EAD8")
+    private val dim = Color.parseColor("#9C968A")
+    private val cardBg = Color.parseColor("#17171C")
+    private val line = Color.parseColor("#2C2C33")
+    private lateinit var inputCard: LinearLayout
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    private fun card(fill: Int, stroke: Int, radius: Int = 22, width: Int = 1) = GradientDrawable().apply {
+        setColor(fill); cornerRadius = dp(radius).toFloat(); setStroke(dp(width), stroke)
+    }
+
+    /** A focusable pill or card: an amber ring and a little growth when the remote lands on it. */
+    private fun focusable(v: View, fill: Int, radius: Int = 22) {
+        v.isFocusable = true; v.isClickable = true
+        v.background = card(fill, line, radius)
+        v.setOnFocusChangeListener { x, f ->
+            x.background = card(fill, if (f) amber else line, radius, if (f) 3 else 1)
+            x.animate().scaleX(if (f) 1.03f else 1f).scaleY(if (f) 1.03f else 1f).setDuration(120).start()
+        }
+    }
+
+    private fun pillButton(label: String, primary: Boolean, onClick: () -> Unit) = TextView(this).apply {
+        text = label; textSize = 22f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+        setTextColor(if (primary) Color.parseColor("#1A1405") else ink)
+        setPadding(dp(30), dp(16), dp(30), dp(16))
+        focusable(this, if (primary) amber else cardBg, 40)
+        if (primary) setOnFocusChangeListener { x, f ->
+            x.background = card(amber, if (f) Color.WHITE else amber, 40, if (f) 3 else 1)
+            x.animate().scaleX(if (f) 1.05f else 1f).scaleY(if (f) 1.05f else 1f).setDuration(120).start()
+        }
+        setOnClickListener { onClick() }
+    }
+
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        App.startService(this)   // the phone remote's server runs again whenever this opens
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        val dp = resources.displayMetrics.density
-        fun px(v: Int) = (v * dp).toInt()
-        fun pill(c: Int) = GradientDrawable().apply { setColor(c); cornerRadius = px(14).toFloat() }
-        fun btn(label: String) = Button(this).apply {
-            text = label; isAllCaps = false; textSize = 20f; setTextColor(Color.parseColor("#F2EAD8"))
-            background = pill(Color.parseColor("#1B1B20")); setPadding(px(22), px(14), px(22), px(14)); isFocusable = true
-            setOnFocusChangeListener { v, f -> v.background = pill(Color.parseColor(if (f) "#4A3A12" else "#1B1B20")) }
-        }
 
-        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(px(64), px(40), px(64), px(40)) }
-        col.addView(TextView(this).apply { text = "Ask"; textSize = 38f; setTextColor(Color.parseColor("#F2EAD8")); typeface = Typeface.DEFAULT_BOLD })
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(80), dp(44), dp(80), dp(44)) }
+        col.addView(TextView(this).apply { text = "Ask"; textSize = 44f; setTextColor(ink); typeface = Typeface.DEFAULT_BOLD })
+        col.addView(TextView(this).apply {
+            text = "Say or type what you want. Press OK on a suggestion to start it."
+            textSize = 20f; setTextColor(dim)
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
+
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        inputCard = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(dp(26), dp(8), dp(26), dp(8)); background = card(cardBg, line, 30) }
         input = EditText(this).apply {
-            hint = "What do you want to watch or do?"; textSize = 24f; setTextColor(Color.parseColor("#F2EAD8")); setHintTextColor(Color.parseColor("#8A8478"))
-            imeOptions = EditorInfo.IME_ACTION_SEND; setSingleLine(true)
+            hint = "Something funny, under an hour…"; textSize = 26f; setTextColor(ink); setHintTextColor(Color.parseColor("#6E695F"))
+            background = null; imeOptions = EditorInfo.IME_ACTION_SEND; setSingleLine(true)
             setOnEditorActionListener { _, _, _ -> send(); true }
+            setOnFocusChangeListener { _, f -> inputCard.background = card(cardBg, if (f) amber else line, 30, if (f) 3 else 1) }
         }
-        row.addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        if (hasRecognizer()) row.addView(btn("Speak").apply { setOnClickListener { listen() } }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = px(16) })
-        row.addView(btn("Send").apply { setOnClickListener { send() } }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = px(16) })
-        col.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(20) })
-        status = TextView(this).apply { textSize = 18f; setTextColor(Color.parseColor("#BDB6A7")) }
-        col.addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(14) })
-        reply = TextView(this).apply { textSize = 24f; setTextColor(Color.parseColor("#F2EAD8")) }
-        col.addView(reply, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(10) })
-        options = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        col.addView(options, LinearLayout.LayoutParams(-1, -2).apply { topMargin = px(14) })
+        inputCard.addView(input, LinearLayout.LayoutParams(-1, dp(64)))
+        row.addView(inputCard, LinearLayout.LayoutParams(0, -2, 1f))
+        if (hasRecognizer()) row.addView(pillButton("🎤  Speak", true) { listen() }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(18) })
+        row.addView(pillButton("Send", false) { send() }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(14) })
+        col.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(28) })
 
-        setContentView(ScrollView(this).apply { setBackgroundColor(Color.parseColor("#0B0B0D")); isFillViewport = true; addView(col) })
+        status = TextView(this).apply { textSize = 20f; setTextColor(amber) }
+        col.addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(18) })
+        reply = TextView(this).apply {
+            textSize = 26f; setTextColor(ink); setLineSpacing(0f, 1.15f); setPadding(dp(28), dp(22), dp(28), dp(22)); visibility = View.GONE
+            background = card(cardBg, line, 24)
+        }
+        col.addView(reply, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        options = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(options, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+
+        val bg = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#14161F"), Color.parseColor("#09090B")))
+        setContentView(ScrollView(this).apply { background = bg; isFillViewport = true; addView(col) })
         if (!Ask.enabled) {
-            status.text = "Ask is off. On a phone open http://${App.lanAddress() ?: "<tv address>"}:5400/setup to pick an AI service."
-        } else if (!hasRecognizer()) status.text = "Type with the remote's keyboard (this TV has no voice input for apps)."
-        else status.text = "Press Speak, or type."
+            status.setTextColor(dim)
+            status.text = "Ask is off. On a phone open http://${App.lanAddress() ?: "<tv address>"}:5400/setup and pick an AI service."
+        } else status.text = if (hasRecognizer()) "Press the mic button on the remote, or type." else "Type with the remote's keyboard."
         input.requestFocus()
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(i: Intent) { super.onNewIntent(i); handleIntent(i) }
+
+    /** The remote's microphone button opens this with "listen": start listening at once. */
+    private fun handleIntent(i: Intent?) {
+        if (i?.getBooleanExtra("listen", false) == true && hasRecognizer() && Ask.enabled) main.postDelayed({ listen() }, 350)
     }
 
     private fun hasRecognizer() = packageManager.queryIntentActivities(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH), 0).isNotEmpty()
@@ -101,7 +150,7 @@ class AskActivity : Activity() {
         val text = input.text.toString().trim()
         if (text.isEmpty() || busy) return
         if (!Ask.enabled) { status.text = "Ask is off. Switch it on at http://${App.lanAddress() ?: "<tv address>"}:5400/setup"; return }
-        busy = true; status.text = "Thinking…"; reply.text = ""; options.removeAllViews()
+        busy = true; status.setTextColor(amber); status.text = "Thinking…"; reply.visibility = View.GONE; options.removeAllViews()
         Thread {
             val out: JSONObject? = try { Ask.ask(text, Now.who) } catch (e: Exception) { show(null, e.message ?: "That did not work."); null }
             if (out != null) show(out, null)
@@ -110,25 +159,28 @@ class AskActivity : Activity() {
 
     private fun show(out: JSONObject?, error: String?) = main.post {
         busy = false; status.text = ""
-        reply.text = error ?: out?.optString("reply").orEmpty()
+        val answer = error ?: out?.optString("reply").orEmpty()
+        reply.text = answer; reply.visibility = if (answer.isEmpty()) View.GONE else View.VISIBLE
         val opts = out?.optJSONArray("options") ?: return@post
         for (i in 0 until opts.length()) {
             val o = opts.optJSONObject(i) ?: continue
             val play = o.optJSONObject("play") ?: continue
-            val b = Button(this).apply {
-                text = "▶  ${o.optString("label")}"; isAllCaps = false; textSize = 22f; setTextColor(Color.parseColor("#F2EAD8")); isFocusable = true
-                background = GradientDrawable().apply { setColor(Color.parseColor("#1B1B20")); cornerRadius = 40f }
-                setPadding(48, 28, 48, 28); gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                setOnFocusChangeListener { v, f -> (v.background as GradientDrawable).setColor(Color.parseColor(if (f) "#4A3A12" else "#1B1B20")) }
-                setOnClickListener { start(play) }
-            }
-            options.addView(b, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14 })
-            if (i == 0) b.requestFocus()
+            val parts = o.optString("label").split(" · ", limit = 2)
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(28), dp(18), dp(28), dp(18)) }
+            row.addView(TextView(this).apply { text = "▶"; textSize = 24f; setTextColor(amber) }, LinearLayout.LayoutParams(dp(40), -2))
+            val names = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            names.addView(TextView(this).apply { text = parts[0]; textSize = 26f; setTextColor(ink); typeface = Typeface.DEFAULT_BOLD })
+            if (parts.size > 1) names.addView(TextView(this).apply { text = parts[1]; textSize = 18f; setTextColor(amber) })
+            row.addView(names, LinearLayout.LayoutParams(0, -2, 1f))
+            focusable(row, cardBg, 24)
+            row.setOnClickListener { start(play) }
+            options.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+            if (i == 0) row.requestFocus()
         }
     }
 
     private fun start(play: JSONObject) {
-        status.text = "Starting…"
+        status.setTextColor(amber); status.text = "Starting…"
         Thread {
             try {
                 Finder.play(play.getString("title"), null, null, play.optString("service").ifEmpty { null }, Now.who)
