@@ -312,7 +312,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         when (state) {
             "on" -> if (!Tv.powerOn()) throw ApiError(503, "The TV app cannot wake a sleeping TV. Turn it on with its own remote.")
             "off" -> if (Tv.isOn) Tv.powerOff()
-            "toggle" -> if (Tv.isOn) Tv.powerOff() else if (!Tv.powerOn()) throw ApiError(503, "The TV app cannot wake a sleeping TV.")
+            "toggle" -> if (Tv.screenOff) Tv.powerOn() else if (Tv.isOn) Tv.powerOff() else if (!Tv.powerOn()) throw ApiError(503, "The TV app cannot wake a sleeping TV.")
             else -> throw ApiError(400, "state must be on, off or toggle")
         }
         Now.push()
@@ -361,6 +361,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("updated", Store.str("home_settings_updated") ?: JSONObject.NULL)
         .put("people", Store.people()).put("weather", Store.weather()).put("country", Store.country()).put("tv_name", Store.tvName())
         .put("ask", Ask.status())
+        .put("off_mode", Tv.offMode).put("home_app", Tv.hasPackage("app.couchtv.launcher"))
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
         .put("skip_watch_next", JSONArray(Store.skipWatchNext().sorted())).put("watch_next_per_app", Store.watchNextPerApp())
         .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
@@ -409,6 +410,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 .put("place", w.optString("place").take(40)).put("timezone", w.optString("timezone", "UTC").take(40)).toString())
             Weather.clear()
         }
+        b.optString("off_mode").takeIf { it == "standby" || it == "screen_off" }?.let { Store.putStr("off_mode", it) }
         b.optString("country").takeIf { Regex("[A-Z]{2}").matches(it) }?.let { Store.putStr("country", it) }
         b.optString("tv_name").trim().takeIf { it.isNotEmpty() }?.let { Store.putStr("tv_name", it.take(30)) }
         if (b.has("patchwall_replace") && FireHome.isXiaomi) {

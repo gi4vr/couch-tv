@@ -43,7 +43,7 @@ class FireWatch : AccessibilityService() {
     private var recheckPending = false
     private val recheck = Runnable {
         recheckPending = false
-        if (stockInFront && !CrashGuard.standingAside(this)) bringBack()
+        if (stockInFront && !CrashGuard.standingAside(this) && SystemClock.elapsedRealtime() >= restUntil) bringBack()
     }
 
     override fun onInterrupt() {}
@@ -95,6 +95,7 @@ class FireWatch : AccessibilityService() {
             !(e.packageName?.toString() == AMAZON_HOME && settingsAllowed())
         if (!stockInFront) return
         if (CrashGuard.standingAside(this)) return
+        if (SystemClock.elapsedRealtime() < restUntil) return   // BACK was held: the TV's own home stays for a moment
         val wait = DEBOUNCE_MS - (System.currentTimeMillis() - last)
         if (wait > 0) {
             // Skipped as a repeat press. Some Google TVs (seen on a Xiaomi) keep the Google home as the
@@ -126,6 +127,9 @@ class FireWatch : AccessibilityService() {
     companion object {
         /** Set while Android has this service bound. */
         @Volatile var connected = false
+        @Volatile private var restUntil = 0L
+        /** Hold BACK on the home: the TV's own home is allowed to stay in front for [ms]. */
+        fun restFor(ms: Long) { restUntil = SystemClock.elapsedRealtime() + ms }
         private const val DEBOUNCE_MS = 1200L   // one jump per press, not one per event
         private const val BOOT_WINDOW_MS = 2 * 60_000L
 

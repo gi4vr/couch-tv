@@ -149,6 +149,16 @@ class MainActivity : Activity() {
             connect()
             return
         }
+        // The on-TV app asks for the black Screen off mode (its "turn off" with the off mode set to screen_off),
+        // and later for the picture back. The TV itself stays on and on the network.
+        if (intent.getBooleanExtra("screen_off", false)) {
+            main.postDelayed({ js("window.tv && tv.screenOff && tv.screenOff()") }, 400)
+            return
+        }
+        if (intent.getBooleanExtra("wake_screen", false)) {
+            main.postDelayed({ js("window.tv && tv.wakeScreen && tv.wakeScreen()") }, 250)
+            return
+        }
         // The remote's gear button, caught by KeyWatch: open the gear menu (a moment's wait in case
         // we were just brought forward from another app and the page is still settling).
         if (intent.getBooleanExtra("gear", false)) {
@@ -198,6 +208,9 @@ class MainActivity : Activity() {
         js("window.tv && tv.pause && tv.pause()")   // the video background stops while an app is in front
     }
 
+    private val BACK_HOLD_MS = 2000L
+    private var backHoldDone = false
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         // Every kind of remote: game controller A, Select and the number pad's Enter count as OK,
         // controller B and Escape as BACK. The page then only has to know OK and BACK.
@@ -224,8 +237,23 @@ class MainActivity : Activity() {
             KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_LAST_CHANNEL, KeyEvent.KEYCODE_TV_INPUT -> return false
         }
         // The home screen never exits on BACK; the page decides what BACK means.
+        // Hold BACK for about two seconds: the TV's own home opens and stays (the Home button watch rests for
+        // a minute), the way out when couch-tv is in the way. A normal BACK press is unchanged.
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
-            if (event.action == KeyEvent.ACTION_UP && pageReady) js("window.tv && tv.back()")
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (event.repeatCount == 0) backHoldDone = false
+                if (!backHoldDone && event.eventTime - event.downTime >= BACK_HOLD_MS) {
+                    backHoldDone = true
+                    FireWatch.restFor(60_000L)
+                    CrashGuard.openStockHome(this)
+                }
+                return true
+            }
+            if (event.action == KeyEvent.ACTION_UP) {
+                val wasHold = backHoldDone
+                backHoldDone = false
+                if (!wasHold && pageReady) js("window.tv && tv.back()")
+            }
             return true
         }
         return super.dispatchKeyEvent(event)

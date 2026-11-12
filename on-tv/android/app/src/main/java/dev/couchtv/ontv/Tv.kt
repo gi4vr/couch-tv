@@ -210,15 +210,49 @@ object Tv {
     }
 
     // ---------- power ----------
+    /** "standby" (the TV sleeps: on some TVs it then drops off the network) or "screen_off" (the TV stays on, black and silent). */
+    val offMode: String get() = if (Store.str("off_mode") == "screen_off") "screen_off" else "standby"
+    private const val HOME_APP = "app.couchtv.launcher"
+
+    /** True while the black Screen off mode is on, so "on" wakes the picture and "off" is not sent twice. */
+    val screenOff: Boolean get() = Store.bool("screen_is_off")
+
     fun powerOff() {
+        if (offMode == "screen_off" && hasPackage(HOME_APP) && runCatching { screenOffNow() }.getOrDefault(false)) return
         needAdb("Turning the TV off")
-        Adb.quick("input keyevent KEYCODE_SLEEP")
-        Thread.sleep(1500)
+        // KEYCODE_POWER (not KEYCODE_SLEEP): measured on a TCL, SLEEP drops the TV off the network for good (no ping, no ADB,
+        // no Wake-on-LAN over Wi-Fi), so Apple Home and Home Assistant could not wake it again. POWER is the same light
+        // standby the remote's own button reaches from a phone: the TV stays reachable and KEYCODE_WAKEUP brings it back.
         if (power.isInteractive) Adb.quick("input keyevent KEYCODE_POWER")
+    }
+
+    /**
+     * Pauses what is playing and has the Couch TV Home app show its Screen off mode: a black screen with the
+     * backlight down, while the TV itself stays on and on the network (Apple Home and Home Assistant still see it).
+     * Needs the Home app (app.couchtv.launcher). Any button on the remote wakes the picture.
+     */
+    private fun screenOffNow(): Boolean {
+        runCatching { key("pause") }
+        Thread.sleep(400)
+        ctx.startActivity(Intent().setClassName(HOME_APP, "$HOME_APP.MainActivity").putExtra("screen_off", true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        Store.putBool("screen_is_off", true)
+        return true
+    }
+
+    private fun wakeScreen(): Boolean {
+        if (!Store.bool("screen_is_off")) return false
+        Store.putBool("screen_is_off", false)
+        runCatching {
+            ctx.startActivity(Intent().setClassName(HOME_APP, "$HOME_APP.MainActivity").putExtra("wake_screen", true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        return true
     }
 
     /** Only works while the TV is in light standby and the app is still running. A sleeping TV cannot be woken by itself. */
     fun powerOn(): Boolean {
+        if (wakeScreen()) return true
         if (power.isInteractive) return true
         if (!Adb.connected && (!(Adb.everAllowed || Adb.paired) || !Adb.ensure())) return false
         Adb.quick("input keyevent KEYCODE_WAKEUP")
