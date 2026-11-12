@@ -119,6 +119,7 @@ class FireWatch : AccessibilityService() {
         override fun onReceive(c: Context, i: Intent) {
             if (i.action == Intent.ACTION_MY_PACKAGE_REPLACED) CrashGuard.reset(c)   // a new version gets a fresh try
             runCatching { ensure(c) }
+            runCatching { WatchKeeper.schedule(c) }
         }
     }
 

@@ -167,6 +167,11 @@
             </intent-filter>
             <meta-data android:name="android.media.tv.input" android:resource="@xml/tcl_placeholder_input" />
         </service>
+        <!-- Puts the Home button watch back on if the TV ended the app in the background (WatchKeeper.kt). -->
+        <service
+            android:name=".WatchKeeper"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <receiver android:name=".FireWatch$Restore" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

@@ -101,6 +101,7 @@ class MainActivity : Activity() {
         io.execute { warmApps() }
         askWatchNextPermission()
         Doorbell.start(this)   // smart home (optional): nothing happens unless a doorbell is set up
+        WatchKeeper.schedule(applicationContext)   // keeps the watch on if the TV ends the app in the background
         FireWatch.ensure(this)   // Fire TV only, and only once a computer has switched it on
         main.postDelayed({ FireWatch.rebindIfUnbound(applicationContext) }, 10_000L)   // listed but not bound after a force-stop
         // At power-on the page is often asked for before Wi-Fi is up: try again the moment it is.
