@@ -182,7 +182,12 @@ class BridgeService : Service() {
         } catch (e: Exception) { Log.e("couchtv", "server failed to start", e) }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { startServer(); return START_STICKY }
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // The Couch TV Home app saw the server not answering (hung, or its thread ended): start a new one
+        if (intent?.getBooleanExtra("restart_server", false) == true) { runCatching { server?.stop() }; server = null }
+        startServer()
+        return START_STICKY
+    }
 
     private val screenOn = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) { FireHome.onScreenOn() }
@@ -198,6 +203,13 @@ class BridgeService : Service() {
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
+        if (i.action == "dev.couchtv.ontv.KEEPALIVE") {
+            runCatching {
+                val s = Intent(c, BridgeService::class.java).putExtra("restart_server", i.getBooleanExtra("restart", false))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) c.startForegroundService(s) else c.startService(s)
+            }
+            return
+        }
         App.startService(c)
         // Xiaomi with "Couch TV in PatchWall's place": after a restart too (the screen-on receiver is not running yet then).
         if (i.action == Intent.ACTION_BOOT_COMPLETED) FireHome.onScreenOn()
