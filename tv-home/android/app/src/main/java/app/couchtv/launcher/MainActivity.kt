@@ -151,6 +151,10 @@ class MainActivity : Activity() {
         }
         // The on-TV app asks for the black Screen off mode (its "turn off" with the off mode set to screen_off),
         // and later for the picture back. The TV itself stays on and on the network.
+        if (intent.getBooleanExtra("ask_listen", false)) {
+            main.postDelayed({ js("window.AskUI && AskUI.open(true)") }, 300)
+            return
+        }
         if (intent.getBooleanExtra("screen_off", false)) {
             main.postDelayed({ js("window.tv && tv.screenOff && tv.screenOff()") }, 400)
             return
@@ -214,6 +218,7 @@ class MainActivity : Activity() {
         startActivity(Intent().setClassName("dev.couchtv.ontv", "dev.couchtv.ontv.AskActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true
     }.getOrDefault(false)
 
+    private val ASK_LISTEN = 7731
     private val BACK_HOLD_MS = 2000L
     private var backHoldDone = false
 
@@ -578,6 +583,41 @@ class MainActivity : Activity() {
         return type
     }
 
+    private var listenId = 0
+    private var recognizer: android.speech.SpeechRecognizer? = null
+
+    private fun startOwnListening(id: Int) {
+        recognizer?.destroy()
+        val r = android.speech.SpeechRecognizer.createSpeechRecognizer(this)
+        recognizer = r
+        r.setRecognitionListener(object : android.speech.RecognitionListener {
+            override fun onReadyForSpeech(p: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(v: Float) { js("window.AskUI && AskUI.level(${"%.1f".format(java.util.Locale.US, v)})") }
+            override fun onBufferReceived(b: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onEvent(t: Int, p: Bundle?) {}
+            override fun onError(e: Int) { js("window.AskUI && AskUI.heard($id, \"\")"); recognizer?.destroy(); recognizer = null }
+            override fun onPartialResults(p: Bundle?) {
+                val t = p?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
+                js("window.AskUI && AskUI.partial(${JSONObject.quote(t)})")
+            }
+            override fun onResults(res: Bundle?) {
+                val t = res?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                js("window.AskUI && AskUI.heard($id, ${JSONObject.quote(t)})")
+                recognizer?.destroy(); recognizer = null
+            }
+        })
+        r.startListening(Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1))
+    }
+
+    private fun askCall(method: String, arg: String): android.os.Bundle = runCatching {
+        contentResolver.call(android.net.Uri.parse("content://dev.couchtv.ontv.ask"), method, arg, null)
+    }.getOrNull() ?: android.os.Bundle().apply { putString("error", "Ask is not available. Is the on-TV app installed?") }
+
     private fun js(code: String) {
         web?.takeIf { pageReady }?.evaluateJavascript(code, null)
     }
@@ -707,6 +747,50 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun openAsk(): Boolean = openAskScreen()
+
+        // Ask drawn by the home page itself: the page sends the request, the on-TV app's AI answers, the page shows it.
+        // Calls the on-TV app's provider (same signing key only) off the main thread and hands the answer back to
+        // window.AskUI.result(id, json, error).
+        @JavascriptInterface
+        fun askRun(id: Int, text: String) {
+            Thread {
+                val r = askCall("ask", text)
+                main.post { js("window.AskUI && AskUI.result($id, ${JSONObject.quote(r.getString("json") ?: "")}, ${JSONObject.quote(r.getString("error") ?: "")})") }
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun askPlay(json: String) {
+            Thread {
+                val r = askCall("play", json)
+                val err = r.getString("error") ?: ""
+                main.post { js("window.AskUI && AskUI.played(${JSONObject.quote(err)})") }
+            }.start()
+        }
+
+        /**
+         * Listens with the TV's speech recognizer, if it has one. With the microphone permission it listens without
+         * a dialog of its own and the page shows the words as they come (AskUI.partial, AskUI.level, AskUI.heard);
+         * without it, the system's own listening window is used. Returns false when there is no recognizer.
+         */
+        @JavascriptInterface
+        fun askListen(id: Int): Boolean {
+            listenId = id
+            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED &&
+                android.speech.SpeechRecognizer.isRecognitionAvailable(this@MainActivity)) {
+                main.post { startOwnListening(id) }
+                return true
+            }
+            val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            if (packageManager.queryIntentActivities(i, 0).isEmpty()) return false
+            main.post { runCatching { startActivityForResult(i, ASK_LISTEN) } }
+            return true
+        }
+
+        @JavascriptInterface
+        fun askStopListening() { main.post { recognizer?.stopListening() } }
 
         // Screen off / Audio-only mode: drops window backlight override to 0f on Android TV
         // while soundscapes, Spotify or background media continue playing.
@@ -860,6 +944,11 @@ class MainActivity : Activity() {
     // The framework's own result callback (this app has no AndroidX, so no result API).
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == ASK_LISTEN) {
+            val heard = if (resultCode == RESULT_OK) data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty() else ""
+            js("window.AskUI && AskUI.heard($listenId, ${JSONObject.quote(heard)})")
+            return
+        }
         if (requestCode == HomeRole.REQUEST) { js("window.tv && tv.homeAnswered && tv.homeAnswered(" + HomeRole.held(this) + ")"); return }
         if (requestCode != PICK_PHOTOS) return
         val uris = mutableListOf<android.net.Uri>()

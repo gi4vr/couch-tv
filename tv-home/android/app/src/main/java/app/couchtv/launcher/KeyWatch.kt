@@ -28,8 +28,9 @@ class KeyWatch : AccessibilityService() {
         if (isAssist(event) && micAsk(this)) {
             if (event.action == KeyEvent.ACTION_UP && event.repeatCount == 0) {
                 runCatching {
-                    startActivity(Intent().setClassName(ON_TV, "$ON_TV.AskActivity")
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("listen", true))
+                    // the home page draws Ask itself and listens at once (ask_listen)
+                    startActivity(Intent(this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("ask_listen", true))
                 }
             }
             return true

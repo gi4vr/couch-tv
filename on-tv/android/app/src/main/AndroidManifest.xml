@@ -34,6 +34,9 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <!-- See the TV's own home screens, so the Home button watch can tell a Home press from any other screen (#98). -->
+    <!-- Only the Couch TV Home app (same signing key) may use Ask through this app. -->
+    <permission android:name="dev.couchtv.ontv.permission.ASK" android:protectionLevel="signature" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -60,6 +63,11 @@
         android:allowBackup="false"
         android:supportsRtl="false">
 
+        <provider
+            android:name=".AskProvider"
+            android:authorities="dev.couchtv.ontv.ask"
+            android:exported="true"
+            android:permission="dev.couchtv.ontv.permission.ASK" />
         <!-- Ask on the TV with the remote: opened from the Couch TV Home's Ask quick button. -->
         <activity
             android:name=".AskActivity"

@@ -1865,7 +1865,7 @@
     else if (q === "input") openInputs();
     else if (q === "screensaver") startScreensaver();
     else if (q === "extend") devExtend();
-    else if (q === "ask") { try { TV.openAsk(); } catch (e) {} }
+    else if (q === "ask") { if (window.AskUI) window.AskUI.open(false); else { try { TV.openAsk(); } catch (e) {} } }
     else if (q === "bluetooth" || q === "network") openSettingsScreen(q);
   }
   // Headphones: the TV's own Bluetooth screen. The launcher opens it itself, the on-TV app through

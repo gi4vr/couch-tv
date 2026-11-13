@@ -28,6 +28,10 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <!-- See every app that has a TV launcher entry, so the fallback grid and app tiles can list them. -->
+    <uses-permission android:name="dev.couchtv.ontv.permission.ASK" />
+    <!-- Ask listens with the TV's speech recognizer only while someone opened Ask and pressed the mic. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -40,6 +44,9 @@
         <package android:name="com.google.android.tvlauncher" />
         <!-- The on-TV app: its Ask screen is opened from the Ask quick button. -->
         <package android:name="dev.couchtv.ontv" />
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />

@@ -168,6 +168,8 @@ fi
 # keeps crashing, the watch stands aside and the TV's own home stays (CrashGuard.kt).
 if echo "$present" | grep -qx -E "com.google.android.apps.tv.launcherx|com.google.android.tvlauncher|com.amazon.tv.launcher"; then
   "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.WRITE_SECURE_SETTINGS" > /dev/null 2>&1 || true
+  # Ask listens in the home itself (no system dialog) only where the on-TV app is installed and the person pressed the mic
+  "$PY" "$T" shell "pm grant app.couchtv.launcher android.permission.RECORD_AUDIO" > /dev/null 2>&1 || true
   CUR=$("$PY" "$T" shell "settings get secure enabled_accessibility_services" | tr -d '\r')
   case ":$CUR:" in
     *":$WATCH:"*|*":app.couchtv.launcher/app.couchtv.launcher.FireWatch:"*)
