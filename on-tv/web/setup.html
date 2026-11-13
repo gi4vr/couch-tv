@@ -103,6 +103,17 @@
   </section>
 
   <section class="card">
+    <h2>Home Assistant for Ask (optional, off by default)</h2>
+    <p>With this on, Ask can also switch things at home: "turn off the living room light", "movie night", "make the bedroom 22 degrees". It can reach lights, switches, fans, scenes, scripts, air conditioning and blinds. Locks, alarms and garage or gate doors are never reachable. In Home Assistant make a separate user for the TV, open its profile, Security, and create a long-lived access token. Paste it here: it is stored on the TV, sent only to the address below and never shown again. Ask must be switched on too.</p>
+    <label for="ha-url">Home Assistant address, for example http://homeassistant.local:8123</label><input id="ha-url" type="text" autocomplete="off" spellcheck="false">
+    <label for="ha-token">Access token (leave empty to keep the current one)</label><input id="ha-token" type="password" autocomplete="off">
+    <label class="check"><input type="checkbox" id="ha-on"> Let Ask use Home Assistant</label>
+    <p id="ha-state"></p>
+    <div class="row"><button class="go" id="ha-save">Save Home Assistant</button><button id="ha-clear">Remove token</button></div>
+    <div class="msg" id="ha-msg" role="status"></div>
+  </section>
+
+  <section class="card">
     <h2>Phones</h2>
     <p id="phones"></p>
     <button id="forget">Forget every phone</button>
@@ -135,7 +146,7 @@
         $('pw-on').checked = !!j.patchwall_replace;
         $('pw-state').textContent = j.watch ? '' : 'The Home button watch is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
       }
-      showAsk(j.ask);
+      showAsk(j.ask); showHa(j.home_assistant || {});
       $('phones').textContent = j.phones + (j.phones === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
       showAdb(j.adb);
       // Android 13+ (most Google TVs): pairing first, 5555 second. Older TVs: the other way round.
@@ -215,6 +226,20 @@
     api('POST', '/api/settings', body).then(function () {
       $('ask-key').value = ''; $('ask-msg').textContent = 'Saved. If you changed the service, type its key too: a key is never sent to a different service.'; load();
     }).catch(function (e) { $('ask-msg').textContent = e.message; });
+  };
+  function showHa(h) {
+    $('ha-url').value = h.url || ''; $('ha-on').checked = !!h.enabled;
+    $('ha-state').textContent = (h.has_token ? 'A token is saved.' : 'No token saved.') + (h.ready ? ' Ready.' : '');
+  }
+  $('ha-save').onclick = function () {
+    var body = { ha_enabled: $('ha-on').checked, ha_url: $('ha-url').value.trim() };
+    if ($('ha-token').value.trim()) body.ha_token = $('ha-token').value.trim();
+    api('POST', '/api/settings', body).then(function () {
+      $('ha-token').value = ''; $('ha-msg').textContent = 'Saved. If you changed the address, paste its token again: a token is never sent to a different address.'; load();
+    }).catch(function (e) { $('ha-msg').textContent = e.message; });
+  };
+  $('ha-clear').onclick = function () {
+    api('POST', '/api/settings', { ha_token: '', ha_enabled: false }).then(function () { $('ha-msg').textContent = 'Token removed.'; load(); });
   };
   $('pw-save').onclick = function () {
     api('POST', '/api/settings', { patchwall_replace: $('pw-on').checked }).then(function () { $('pw-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('pw-msg').textContent = e.message; });

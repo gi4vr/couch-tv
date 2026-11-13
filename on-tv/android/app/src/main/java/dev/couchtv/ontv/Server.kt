@@ -360,7 +360,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("settings", Store.readJson("home-settings.json") as? JSONObject ?: JSONObject())
         .put("updated", Store.str("home_settings_updated") ?: JSONObject.NULL)
         .put("people", Store.people()).put("weather", Store.weather()).put("country", Store.country()).put("tv_name", Store.tvName())
-        .put("ask", Ask.status())
+        .put("ask", Ask.status()).put("home_assistant", HomeAssistant.status())
         .put("off_mode", Tv.offMode).put("home_app", Tv.hasPackage("app.couchtv.launcher"))
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
         .put("skip_watch_next", JSONArray(Store.skipWatchNext().sorted())).put("watch_next_per_app", Store.watchNextPerApp())
@@ -390,6 +390,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
     }
 
     private fun saveSettings(b: JSONObject) {
+        HomeAssistant.save(b)
         Ask.save(b)   // first: a wrong Ask setting answers 400 before anything else in the request is saved
         b.optJSONObject("settings")?.let {
             if (it.toString().length > 32_000) throw ApiError(413, "settings are too big")

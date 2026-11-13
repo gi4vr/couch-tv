@@ -93,6 +93,14 @@ object Ask {
                     .put("properties", JSONObject().put("title", str("Show or film name")).put("service", str("App id from the list that can play it, for example netflix")))
                     .put("required", JSONArray().put("title")))), listOf("items")))
 
+    private val HOME_TOOLS = listOf(
+        AskTool("home_list", "List the lights, switches, fans, scenes, scripts, air conditioners and blinds in the house with their current state. Call this first when you need an entity id.",
+            JSONObject(), emptyList()),
+        AskTool("home_do", "Switch something in the house. action is on, off, toggle or set. For set give value: brightness 0 to 100 for a light, temperature in degrees for air conditioning, position 0 to 100 for a blind. Scenes and scripts only take on.",
+            JSONObject().put("entity_id", str("From home_list, for example light.living_room")).put("action", str("on, off, toggle or set")).put("value", int()), listOf("entity_id", "action")))
+
+    private fun tools() = if (HomeAssistant.ready) TOOLS + HOME_TOOLS else TOOLS
+
     fun ask(text: String, who: String?): JSONObject {
         val cfg = config()
         if (!cfg.ready) throw ApiError(501, "Ask is off in on-TV mode.")
@@ -101,11 +109,12 @@ object Ask {
             "Apps on this TV: ${installedApps()}. Only open apps from this list. " +
             "If the person asks for a suggestion or recommendation, call the suggest tool once with two to four specific titles, each with one app id from the list above that could play it, then reply with one short sentence introducing them. Never name an app that is not in the list. " +
             "You can also change the volume, set or cancel the sleep timer, and turn the TV off with the tools. " +
+            (if (HomeAssistant.ready) "You can also switch things in the house (lights, switches, fans, scenes, air conditioning, blinds) with home_list and home_do. Call home_list once to find the exact entity id, then home_do. You cannot open locks, doors or garage doors. " else "") +
             "Reply in plain text only: no markdown, no asterisks, no bullet lists. " +
             "If something fails, try at most one other way, then say plainly what did not work. " +
             "Country: ${Store.country()}." + (who?.let { " Watching: $it." } ?: "")
         val options = JSONArray()
-        val out = AskWire.run(AskWire.chat(cfg, system, TOOLS), text, { url, headers, body -> call(cfg, url, headers, body) }, { name, a ->
+        val out = AskWire.run(AskWire.chat(cfg, system, tools()), text, { url, headers, body -> call(cfg, url, headers, body) }, { name, a ->
             if (name == "suggest") collectSuggestions(a, options) else runTool(name, a, who)
         }, stopAfter = setOf("suggest"))
         return JSONObject().put("ok", true).put("reply", out.reply).put("actions", out.actions).put("options", options)
@@ -163,6 +172,8 @@ object Ask {
             if (min > 0) "the TV turns off in $min minutes" else "sleep timer cancelled"
         }
         "power" -> { Tv.powerOff(); "turned off" }
+        "home_list" -> if (HomeAssistant.ready) HomeAssistant.list() else throw IllegalArgumentException("Home Assistant is not set up")
+        "home_do" -> if (HomeAssistant.ready) HomeAssistant.act(a.getString("entity_id"), a.getString("action"), a) else throw IllegalArgumentException("Home Assistant is not set up")
         else -> throw IllegalArgumentException("unknown tool $name")
     }
 
