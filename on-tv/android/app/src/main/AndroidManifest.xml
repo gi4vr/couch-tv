@@ -137,6 +137,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <!-- The Couch TV Home app asks for the phone remote's server to be running again after the TV ended this app. -->
+                <action android:name="dev.couchtv.ontv.KEEPALIVE" />
             </intent-filter>
         </receiver>
     </application>

@@ -58,7 +58,20 @@ class FireWatch : AccessibilityService() {
         return true
     }
 
+    /**
+     * The on-TV app's server (the phone remote, port 5400) is ended by TVs that clear apps in the background (a TCL
+     * does). This watch is always running, so every few minutes it looks whether that server answers on this TV and,
+     * if the on-TV app is installed but silent, asks it to start again. Nothing is read or sent beyond the ping.
+     */
+    private val keepOnTv = object : Runnable {
+        override fun run() {
+            Thread { runCatching { OnTvKeeper.check(this@FireWatch) } }.start()
+            handler.postDelayed(this, ON_TV_CHECK_MS)
+        }
+    }
+
     override fun onServiceConnected() {
+        handler.removeCallbacks(keepOnTv); handler.postDelayed(keepOnTv, 20_000L)
         connected = true
         // Key filtering is switched on at run time and only on Xiaomi, so no other TV sees key presses here.
         if (isXiaomi()) runCatching {
@@ -83,6 +96,7 @@ class FireWatch : AccessibilityService() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        handler.removeCallbacks(keepOnTv)
         connected = false
         handler.removeCallbacks(recheck)
         recheckPending = false
@@ -130,6 +144,7 @@ class FireWatch : AccessibilityService() {
         @Volatile private var restUntil = 0L
         /** Hold BACK on the home: the TV's own home is allowed to stay in front for [ms]. */
         fun restFor(ms: Long) { restUntil = SystemClock.elapsedRealtime() + ms }
+        private const val ON_TV_CHECK_MS = 4 * 60_000L
         private const val DEBOUNCE_MS = 1200L   // one jump per press, not one per event
         private const val BOOT_WINDOW_MS = 2 * 60_000L
 
