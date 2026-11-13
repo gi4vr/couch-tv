@@ -98,8 +98,8 @@
     busy = false; dropPending();
     if (error) { bubble("ai err", error); pos = { r: 1, c: 1 }; paint(); return; }
     var out = {}; try { out = JSON.parse(json); } catch (e) {}
-    var reply = clean(out.reply); if (reply) bubble("ai", reply);
     var opts = (out.options || []).filter(function (o) { return o && o.play; }).slice(0, 4);
+    var reply = clean(out.reply) || (opts.length ? t("ask_ideas") : ""); if (reply) bubble("ai", reply);
     rows[0] = opts.map(function (o, i) {
       var parts = String(o.label || o.text || "").split(" · ");
       var c = el("div", "ask-card", '<div class="play">▶</div><b>' + esc(parts[0]) + "</b>" + (parts[1] ? "<span>" + esc(parts[1]) + "</span>" : ""));

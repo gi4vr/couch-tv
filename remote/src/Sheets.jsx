@@ -127,7 +127,7 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
     let reply;
     try {
       const r = await onAsk(ask);
-      reply = { text: r.say || r.reply || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 4), still: /^Still working on it/.test(r.reply || '') };
+      reply = { text: r.say || r.reply || (Array.isArray(r.options) && r.options.length ? 'Here are a few ideas:' : 'Done.'), options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 4), still: /^Still working on it/.test(r.reply || '') };
       // The chat never closes by itself (it used to close after a plain "done it" answer). It closes
       // only on the X, the scrim, Escape or Back; the answer stays in the thread.
       if (c === chat.current) tick();

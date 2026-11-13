@@ -279,6 +279,17 @@ class AskWireTest {
         assertEquals("Done.", out.reply)
     }
 
+    @Test fun runLoopEndsAtOnceAfterAToolThatIsTheWholeAnswer() {
+        // the suggestion buttons need no second model round: one call to the service, the model's own words kept
+        var calls = 0
+        val reply = """{"choices":[{"message":{"content":"Here you go","tool_calls":[{"id":"c","type":"function","function":{"name":"key","arguments":"{\"key\":\"x\"}"}}]}}]}"""
+        val out = AskWire.run(AskWire.chat(openai(), "s", tools), "something funny", { _, _, _ -> calls++; JSONObject(reply) },
+            { _, _ -> "ok" }, stopAfter = setOf("key"))
+        assertEquals(1, calls)
+        assertEquals("Here you go", out.reply)
+        assertEquals(1, out.actions.length())
+    }
+
     @Test fun runLoopExplainsWhenEveryTryFailedAndItRanOutOfRounds() {
         // what happened on a TV with none of the apps the model guessed: five launches, five failures, then a bare "Done."
         val reply = """{"choices":[{"message":{"tool_calls":[{"id":"c","type":"function","function":{"name":"key","arguments":"{\"key\":\"x\"}"}}]}}]}"""

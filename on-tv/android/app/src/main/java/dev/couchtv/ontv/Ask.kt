@@ -107,7 +107,7 @@ object Ask {
         val options = JSONArray()
         val out = AskWire.run(AskWire.chat(cfg, system, TOOLS), text, { url, headers, body -> call(cfg, url, headers, body) }, { name, a ->
             if (name == "suggest") collectSuggestions(a, options) else runTool(name, a, who)
-        })
+        }, stopAfter = setOf("suggest"))
         return JSONObject().put("ok", true).put("reply", out.reply).put("actions", out.actions).put("options", options)
             .put("seconds", (System.currentTimeMillis() - started) / 1000.0)
     }

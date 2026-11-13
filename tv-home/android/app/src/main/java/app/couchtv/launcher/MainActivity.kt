@@ -142,6 +142,8 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // For measuring the page from a computer (chrome://inspect over adb): only when asked for, never by default.
+        if (intent.hasExtra("webview_debug")) runCatching { WebView.setWebContentsDebuggingEnabled(intent.getBooleanExtra("webview_debug", false)) }
         if (intent.hasExtra("bridge") || intent.hasExtra("config_b64")) {
             readExtras(intent)
             pageReady = false

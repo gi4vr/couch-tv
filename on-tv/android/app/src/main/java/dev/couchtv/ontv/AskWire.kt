@@ -146,7 +146,7 @@ object AskWire {
      * [transport] does the HTTP call and returns the parsed reply (or throws). [runTool] runs one TV tool.
      */
     fun run(chat: AskChat, text: String, transport: (String, Map<String, String>, JSONObject) -> JSONObject,
-            runTool: (String, JSONObject) -> String, maxRounds: Int = 5): AskOutcome {
+            runTool: (String, JSONObject) -> String, maxRounds: Int = 5, stopAfter: Set<String> = emptySet()): AskOutcome {
         val actions = JSONArray()
         val failures = ArrayList<String>()
         chat.addUser(text)
@@ -165,6 +165,9 @@ object AskWire {
                 actions.put(JSONObject().put("tool", c.name).put("args", c.args).put("ok", ok))
                 AskResult(c.id, out, !ok)
             }
+            // A tool whose result is the whole answer (the suggestion buttons) ends it here: no second model round,
+            // which saves several seconds. Whatever words the model already gave stay.
+            if (failures.isEmpty() && turn.calls.any { it.name in stopAfter }) return AskOutcome(turn.text, actions)
             chat.addResults(results)
         }
         return AskOutcome(ending(actions, failures, true), actions)

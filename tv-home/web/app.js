@@ -394,7 +394,11 @@
     document.documentElement.classList.toggle("glass-lite", GLASS === "lite");
     // Lighter home: what was chosen in Home settings, else home.lighter, else on for a WebView with no
     // CSS grid (Android 6 and older, a 1 GB box), where blur, soft shadows and drift make it crawl (#59).
-    LIGHTER = typeof ST.lighter === "boolean" ? ST.lighter : typeof HOME.lighter === "boolean" ? HOME.lighter : OLD_ENGINE;
+    // Measured on a TCL (MediaTek, 4 cores, 2.4 GB): with the blur behind glass about one frame in ten was dropped and a
+    // few took a second; without it the rows ran at a steady 60 fps and the look barely changed. So a TV-class box
+    // (4 cores or fewer) starts lighter, unless Home settings or home.lighter says otherwise.
+    var SLOW_BOX = (navigator.hardwareConcurrency || 8) <= 4;
+    LIGHTER = typeof ST.lighter === "boolean" ? ST.lighter : typeof HOME.lighter === "boolean" ? HOME.lighter : (OLD_ENGINE || SLOW_BOX);
     document.documentElement.classList.toggle("lighter", LIGHTER);
     ambientSync();
     movingTiles();
