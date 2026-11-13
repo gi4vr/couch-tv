@@ -3440,6 +3440,19 @@
       SOUND_STYLE = SOUND_STYLE === "system" ? "soft" : SOUND_STYLE === "soft" ? "off" : "system";
       ST.nav_sound = SOUND_STYLE; saveSettings(); blip(0, 0);
     } });
+    // Remote and keeping alive: the Android side's switches (all on by default), shown only in the real app
+    if (TV && TV.flag && TV.setFlag) {
+      rows.push(head(t("keep_head")));
+      [["mic_ask", "mic_key", TV.canOpenAsk && TV.canOpenAsk()], ["back_hold", "back_hold", true],
+        ["ontv_keepalive", "ontv_keep", TV.canOpenAsk && TV.canOpenAsk()], ["watch_keepalive", "watch_keep", true]].forEach(function (f) {
+        if (!f[2]) return;
+        var on = !!TV.flag(f[0]);
+        rows.push({ kind: "toggle", key: "flag-" + f[0], label: t(f[1]), value: on ? t("on") : t("off"), act: function () {
+          try { TV.setFlag(f[0], !TV.flag(f[0])); } catch (e) { /* */ }
+        } });
+      });
+      rows.push(info("keep-note", t("mic_key_note") + " " + t("back_hold_note") + " " + t("keep_note")));
+    }
     // the video background: its switch only once there is a link
     rows.push(head(t("video_head")));
     if (VIDEO_URL) {

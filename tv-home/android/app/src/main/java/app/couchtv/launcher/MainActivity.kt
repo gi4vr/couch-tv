@@ -222,6 +222,8 @@ class MainActivity : Activity() {
 
     private val ASK_LISTEN = 7731
     private val BACK_HOLD_MS = 2000L
+    private fun backHoldOn() = getSharedPreferences("couchtv", MODE_PRIVATE).getBoolean("back_hold", true)
+    private val FLAGS = setOf("mic_ask", "ontv_keepalive", "watch_keepalive", "back_hold")
     private var backHoldDone = false
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -261,7 +263,7 @@ class MainActivity : Activity() {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_DOWN) {
                 if (event.repeatCount == 0) backHoldDone = false
-                if (!backHoldDone && event.eventTime - event.downTime >= BACK_HOLD_MS) {
+                if (!backHoldDone && backHoldOn() && event.eventTime - event.downTime >= BACK_HOLD_MS) {
                     backHoldDone = true
                     FireWatch.restFor(60_000L)
                     CrashGuard.openStockHome(this)
@@ -887,6 +889,20 @@ class MainActivity : Activity() {
             val fire = if (FireWatch.connected) FireWatch.amazonSettings(packageManager) else null
             val i = fire ?: actions.asSequence().map { Intent(it) }.firstOrNull { packageManager.resolveActivity(it, 0) != null }
             return i?.let { startSettings(it) } ?: false
+        }
+
+        // Home settings, "Remote and keeping alive": switches that the Android side reads (all default on).
+        @JavascriptInterface
+        fun flag(key: String): Boolean =
+            key in FLAGS && getSharedPreferences("couchtv", MODE_PRIVATE).getBoolean(key, true)
+
+        @JavascriptInterface
+        fun setFlag(key: String, on: Boolean): Boolean {
+            if (key !in FLAGS) return false
+            if (key == "watch_keepalive") WatchKeeper.setEnabled(this@MainActivity, on)
+            else getSharedPreferences("couchtv", MODE_PRIVATE).edit().putBoolean(key, on).apply()
+            if (key == "mic_ask" && on) KeyWatch.ensure(this@MainActivity)
+            return true
         }
 
         // The saved copy has its own web storage, so the page keeps what it needs offline here.
